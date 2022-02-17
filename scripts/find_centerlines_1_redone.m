@@ -3,17 +3,21 @@ function branchpoints = find_centerlines_1_redone(fileName,fileFolder)
     points = [];
     
     % set of annotated slices for this dataset (has been hardcoded)
-    filtered_slices = 9:10:799;
-    filtered_slices = [1 filtered_slices]; 
-    radii = [];
+    % filtered_slices = 9:10:799;
+    % filtered_slices = [1 filtered_slices]; 
+    % radii = [];
     
-    for i_idx = 1:size(filtered_slices,2)
+    info = imfinfo(fullfile(fileFolder, fileName));
+    numberOfimgs = length(info);
+
+    for i_idx = 1:numberOfimgs
         % read image from file and split cells, if necessary
-        curr_image = imread(fullfile(fileFolder, fileName), filtered_slices(i_idx));
+        % curr_image = imread(fullfile(fileFolder, fileName), filtered_slices(i_idx));
+        curr_image = imread(fullfile(fileFolder, fileName), i_idx);
         
         % some preprocessing in order to use the bwconncomp function
-        curr_image = ~imbinarize(curr_image);
-        curr_image = WS_segmentation(curr_image);
+        % curr_image = ~imbinarize(curr_image);
+        % curr_image = WS_segmentation(curr_image);
         
         % find centroids of all the cells
         CC = bwconncomp(curr_image);
@@ -27,9 +31,10 @@ function branchpoints = find_centerlines_1_redone(fileName,fileFolder)
             radii(ctr) = 0.5*R(j_idx).EquivDiameter;
             ctr = ctr + 1;
         end
+        
     end
     
-    num_slices = size(filtered_slices,2);
+    num_slices = numberOfimgs;
     % points(points(:,3) ~= 1,3) = points(points(:,3) ~= 1,3)*10 - 11;
     
     % call function which assigns points to cells based on tolerance
@@ -38,93 +43,82 @@ function branchpoints = find_centerlines_1_redone(fileName,fileFolder)
     % next section of code will plot cells whose length is at least 10
     % slices
 
-    [plotted_points, centerpt_plot] = draw_cells(all_cells);
-    
-    sz_ac = size(all_cells,1);
-    for i_idx = 1:sz_ac
-        curr_pt = all_cells(i_idx,:);
-        other_pts = all_cells(all_cells(:,4) ~= curr_pt(4),:);
-        if ismember(curr_pt(1:3),other_pts(:,1:3),'rows')
-            hold on;
-            plot3(curr_pt(1),curr_pt(2),curr_pt(3),'ro');
-        end
-    end
+    [plotted_points, ~] = draw_cells(all_cells);
 
-    % draw branch-points by connecting points that are not in cell to the
-    % closest ones that are
-        
-    branchpoints = draw_branchpoints_2(plotted_points, points, all_cells);
+    plotted_points_new = [];
+    ppn_ctr = 1;
+    sz_pp = size(plotted_points,1);
     
+        
+    % branchpoints = draw_branchpoints_2(plotted_points, points, all_cells);
+    branchpoints = draw_branchpoints_3(plotted_points);
     hold on;
     plot3(branchpoints(:,1), branchpoints(:,2), branchpoints(:,3), 'ro');
     
 end
 
-function branchpoints = draw_branchpoints_3(plotted_points, points, all_cells)
-    centerpt_tolerance = 500;
+function branchpoints = draw_branchpoints_3(plotted_points)
     branchpoints = [];
-    branchpt_tolerance = 1000;
     branchpt_ctr = 1;
     sz_pp = size(plotted_points,1);
+    SIZE_X = 800;
+    SIZE_Y = 800;
     
-    for i_idx = 1:(sz_pp-1)
+    % method 1: use distance to closest cell as radius to see how many
+    % cells there are in the z+1th slice within that given radius. If the
+    % number exceeds two, there must be branching. 
+    
+    for i_idx = 1:(sz_pp)
+        
+        % find this cell, its slice, and the next slice to use  
         curr_pt = plotted_points(i_idx,:);
+        curr_slc = plotted_points(plotted_points(:,3)==curr_pt(3),:);
         next_slc = plotted_points(plotted_points(:,3)==curr_pt(3)+1,:);
+        
+        % computing size information and initializing variables
+        cs_sz = size(curr_slc,1);
         ns_sz = size(next_slc,1);
+        min_dist = SIZE_X^2 + SIZE_Y^2;
+        dist = 0;
         
-        flag = 0;
-        
-        for j_idx=1:ns_sz
-            next_pt = next_slc(j_idx,:);
-            dist = (curr_pt(1) - next_pt(1))^2 + (curr_pt(2) - next_pt(2))^2;
-            if dist < centerpt_tolerance
-                flag = 1;
+        % loop through cells in the current slice, and find the cell that
+        % is closest to the current one 
+        for j_idx = 1:cs_sz
+            cell = curr_slc(j_idx,:);
+            dist = (curr_pt(1) - cell(1))^2 + (curr_pt(2) - cell(2))^2;
+            if dist < min_dist && dist > 0
+                min_dist = dist;
             end
         end
+      
+        within_ctr = 0;
         
-        if flag == 1
-            ctr = 0;
-            for j_idx=1:ns_sz
-                next_pt = next_slc(j_idx,:);
-                dist = (curr_pt(1) - next_pt(1))^2 + (curr_pt(2) - next_pt(2))^2;
-                if dist < branchpt_tolerance
-                    ctr = ctr + 1;
-                end
-            end
-            
-            if ctr >= 2
-                branchpoints(branchpt_ctr,:) = curr_pt;
-                branchpt_ctr = branchpt_ctr + 1;
-            end
-        else
-            curr_slc = plotted_points(plotted_points(:,3)==curr_pt(3),:);
-            cs_sz = size(curr_slc, 1);
-            
-            ctr_1 = 0;
-            for j_idx=1:cs_sz
-                next_pt = curr_slc(j_idx,:);
-                dist = (curr_pt(1) - next_pt(1))^2 + (curr_pt(2) - next_pt(2))^2;
-                if dist < branchpt_tolerance
-                    ctr_1 = ctr_1 + 1;
-                end
-            end
-            
-            ctr_2 = 0;
-            for j_idx=1:ns_sz
-                next_pt = next_slc(j_idx,:);
-                dist = (curr_pt(1) - next_pt(1))^2 + (curr_pt(2) - next_pt(2))^2;
-                if dist < branchpt_tolerance
-                    ctr_2 = ctr_2 + 1;
-                end
-            end          
-            
-            if ctr_1 - 1 == ctr_2
-                branchpoints(branchpt_ctr,:) = curr_pt;
-                branchpt_ctr = branchpt_ctr + 1;
-            end
+        % go to the location of the first cell in the next slice, and see
+        % how many cells are within the previously computed distance. If
+        % there has not been any branching, this number should be 2 (the
+        % cell and the other, closest cell). If it is greater, the first
+        % cell has branched. 
+        
+        for j_idx = 1:ns_sz
+             cell = next_slc(j_idx,:);
+             temp_dist = (curr_pt(1) - cell(1))^2 + (curr_pt(2) - cell(2))^2;
+             
+             if temp_dist <= min_dist
+                 within_ctr = within_ctr + 1;
+             end
+        end
+        
+        if within_ctr > 2
+            branchpoints(branchpt_ctr,:) = curr_pt;
+            branchpt_ctr = branchpt_ctr + 1;
         end
     end
    
+    % method 2: using area. For each cell, find the closest cell in the
+    % z+1th slice. If the closest cell is not far (within some tolerance)
+    % and the area of the new cell is significantly different than that of
+    % the old cell, it is a branch-point. 
+    
 end
 
 function branchpoints = draw_branchpoints_2(plotted_points, points, all_cells)
