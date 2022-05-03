@@ -3,21 +3,21 @@ function branchpoints = find_centerlines_1_redone(fileName,fileFolder)
     points = [];
     
     % set of annotated slices for this dataset (has been hardcoded)
-    % filtered_slices = 9:10:799;
-    % filtered_slices = [1 filtered_slices]; 
+    filtered_slices = 9:10:799;
+    filtered_slices = [1 filtered_slices]; 
     % radii = [];
     
-    info = imfinfo(fullfile(fileFolder, fileName));
-    numberOfimgs = length(info);
+    %info = imfinfo(fullfile(fileFolder, fileName));
+    % numberOfimgs = length(info);
 
-    for i_idx = 1:numberOfimgs
+    for i_idx = 1:size(filtered_slices, 2)
         % read image from file and split cells, if necessary
-        % curr_image = imread(fullfile(fileFolder, fileName), filtered_slices(i_idx));
-        curr_image = imread(fullfile(fileFolder, fileName), i_idx);
+        curr_image = imread(fullfile(fileFolder, fileName), filtered_slices(i_idx));
+        %curr_image = imread(fullfile(fileFolder, fileName), i_idx);
         
         % some preprocessing in order to use the bwconncomp function
-        % curr_image = ~imbinarize(curr_image);
-        % curr_image = WS_segmentation(curr_image);
+        curr_image = ~imbinarize(curr_image);
+        curr_image = WS_segmentation(curr_image);
         
         % find centroids of all the cells
         CC = bwconncomp(curr_image);
@@ -34,7 +34,7 @@ function branchpoints = find_centerlines_1_redone(fileName,fileFolder)
         
     end
     
-    num_slices = numberOfimgs;
+    num_slices = size(filtered_slices, 2);
     % points(points(:,3) ~= 1,3) = points(points(:,3) ~= 1,3)*10 - 11;
     
     % call function which assigns points to cells based on tolerance
@@ -44,19 +44,50 @@ function branchpoints = find_centerlines_1_redone(fileName,fileFolder)
     % slices
 
     [plotted_points, ~] = draw_cells(all_cells);
-
-    plotted_points_new = [];
-    ppn_ctr = 1;
-    sz_pp = size(plotted_points,1);
-    
-        
-    % branchpoints = draw_branchpoints_2(plotted_points, points, all_cells);
-    branchpoints = draw_branchpoints_3(plotted_points);
     hold on;
-    plot3(branchpoints(:,1), branchpoints(:,2), branchpoints(:,3), 'ro');
+    branchpoints = draw_branchpoints_4(plotted_points);
+    hold on;
+    % plot3(branchpoints(:,1), branchpoints(:,2), branchpoints(:,3), 'ro');
     
 end
 
+function branchpoints = draw_branchpoints_4(plotted_points)
+    branchpoints = {};
+    branchpt_ctr = 1;
+    unique_tags = unique(plotted_points(:,4));
+    sz_pp = size(unique_tags,1);
+    BRANCHPOINT_TOLERANCE = 2000;
+    for i_idx = 1:sz_pp
+        cell_tag = unique_tags(i_idx);
+        tagged_cells = plotted_points(plotted_points(:,4)==cell_tag,:);
+        tagged_cells = sortrows(tagged_cells, 3);
+        top_cell = tagged_cells(1,:);
+        bottom_cell = tagged_cells(size(tagged_cells,1),:);
+        
+        tb_cells = [top_cell;bottom_cell];
+        for j_idx = 1:size(tb_cells,1)
+            cell = tb_cells(j_idx,:);
+            other_cells_in_z_slice = plotted_points(plotted_points(:,3)==cell(3),:);
+            sz_oc = size(other_cells_in_z_slice, 1);
+            
+            for k = 1:sz_oc
+                nc = other_cells_in_z_slice(k,:);
+                dist = (cell(1) - nc(1))^2 + (cell(2) - nc(2))^2;
+                if dist <= BRANCHPOINT_TOLERANCE && dist > 0
+                    hold on;
+                    line([cell(1), nc(1)],[cell(2), nc(2)],[cell(3), nc(3)]);
+                    plot3(cell(1), cell(2), cell(3), 'go');
+                    plot3(nc(1), nc(2), nc(3), 'go');
+                    branchpoints{branchpt_ctr} = [cell; nc];
+                    branchpt_ctr = branchpt_ctr + 1;
+                    hold on;
+                end
+            end
+        end
+        
+    end
+    
+end
 function branchpoints = draw_branchpoints_3(plotted_points)
     branchpoints = [];
     branchpt_ctr = 1;
@@ -232,7 +263,7 @@ end
 function all_cells = create_cells(points, num_cells)
     total_z_depth = max(points(:,3));
     HORIZONTAL_TOLERANCE = 500;
-    BLOCK_SIZE = 20;
+    BLOCK_SIZE = 5;
     all_cells = [];
     
     cell_counter = 1;
