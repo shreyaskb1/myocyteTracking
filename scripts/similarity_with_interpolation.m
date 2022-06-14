@@ -1,0 +1,106 @@
+function [accuracy,fp_rate] = similarity_with_interpolation(points_1, points_2, dt_1, dt_2)
+    max_z_pts2 = max(points_2(:,3));
+    similar = [];
+    notsimilar = [];
+    similarCtr = 1;
+    notsimilarCtr = 1;
+    
+    for i_idx = 1:size(points_2, 1)
+        % pick point from hand annotated set and make into tube for
+        % comparison with full stack
+        curr_pt = points_2(i_idx,:);
+        curr_tube = [];
+        ctr = 1;
+        for j_idx = max(0,curr_pt(3)-5):min(max_z_pts2, curr_pt(3)+5)
+            curr_tube(ctr,:) = [curr_pt(1), curr_pt(2), j_idx];
+            ctr = ctr + 1;
+        end
+
+        % for each point in the tube look for a point in the automatically
+        % generated set that is close enough based on the tolerances
+
+        for j_idx = 1:size(curr_tube, 1)
+            
+            % current point in the tube
+            curr_pt = curr_tube(j_idx,:);
+            cp_x = curr_pt(1);
+            cp_y = curr_pt(2);
+            cp_z = curr_pt(3);
+            flag = 0;
+            
+            % look in the same slice of the automatic plot for points that
+            % are close enough
+            relevant_slice = points_1(points_1(:,3) == cp_z, :);
+            
+            for k_idx = 1:size(relevant_slice,1)
+                next_pt = relevant_slice(k_idx,:);
+                np_x = next_pt(1);
+                np_y = next_pt(2);
+
+                dist = (cp_x - np_x)^2 + (cp_y - np_y)^2;
+                if dist <= dt_1
+                    flag = 1;
+                end
+            end
+            
+            % add it to similar or notsimilar based on the flag, which
+            % indicates if a point was found in the automatic plot
+            if flag == 1
+                similar(similarCtr,:) = curr_pt;
+                similarCtr = similarCtr + 1;
+            else
+                notsimilar(notsimilarCtr,:) = curr_pt;
+                notsimilarCtr = notsimilarCtr + 1;
+
+            end
+        end
+    end
+    
+    % find false positives - we must iterate over the automatic plot and
+    % look for similar points in the hand generated plot
+    
+    hg_z = unique(points_2(:,3));
+    falsePos = [];
+    fp_ctr = 1;
+    
+    for i_idx = 1:size(points_1,1)
+        curr_pt = points_1(i_idx,:);
+        min_zs = mink(abs(hg_z-curr_pt(3)),2);
+        cz1 = hg_z(abs(hg_z-curr_pt(3))==min_zs(1));
+        cz2 = hg_z(abs(hg_z-curr_pt(3))==min_zs(2));
+        cz = unique([cz1; cz2], 'rows');
+        
+        all_pts = [points_2(points_2(:,3)==cz(1),:);points_2(points_2(:,3)==cz(2),:)];
+        flag = 0;
+        for j_idx = 1:size(all_pts,1)
+            np = all_pts(j_idx,:);
+            dist = (curr_pt(1) - np(1))^2 + (curr_pt(2) - np(2))^2;
+            if dist < dt_2
+                flag = 1;
+            end
+        end
+        
+        if flag == 0
+            falsePos(fp_ctr,:) = curr_pt;
+            fp_ctr = fp_ctr + 1;
+        end
+    end
+    
+    
+    % plot the similar, notsimilar, and false positive points
+    figure;
+    if size(similar,1) > 0
+        plot3(similar(:,1), similar(:,2), similar(:,3), 'g*');
+    end
+    hold on;
+    if size(notsimilar,1) > 0
+        plot3(notsimilar(:,1), notsimilar(:,2), notsimilar(:,3), 'r*');
+    end
+    hold on;
+    if size(falsePos,1) > 0
+        plot3(falsePos(:,1), falsePos(:,2), falsePos(:,3), 'b*');
+    end
+    
+    accuracy = size(similar,1)/(size(similar,1)+size(notsimilar,1));
+    fp_rate = size(falsePos,1)/(size(points_1,1));
+end
