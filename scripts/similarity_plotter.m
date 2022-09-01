@@ -94,15 +94,15 @@ function [accuracy,fp_rate] = similarity_plotter(points_1, points_2, dt_1, dt_2,
         figure;
         hold on;
         if size(similar,1) > 0
-            plot3(similar(:,1), similar(:,2), similar(:,3), 'g*');
+            plot3(similar(:,1), similar(:,2), similar(:,3), 'g*', 'MarkerSize', 6);
         end
         hold on;
         if size(not_similar,1) > 0
-            plot3(not_similar(:,1), not_similar(:,2), not_similar(:,3), 'r*');
+            plot3(not_similar(:,1), not_similar(:,2), not_similar(:,3), 'r*', 'MarkerSize', 6);
         end
         hold on;
         if size(not_similar_fp,1) > 0
-            plot3(not_similar_fp(:,1), not_similar_fp(:,2), not_similar_fp(:,3), 'b*');
+            plot3(not_similar_fp(:,1), not_similar_fp(:,2), not_similar_fp(:,3), 'b*', 'MarkerSize', 6);
         end
     end
     accuracy = size(similar,1)/(size(similar,1)+size(not_similar,1));

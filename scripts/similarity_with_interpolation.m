@@ -90,15 +90,15 @@ function [accuracy,fp_rate] = similarity_with_interpolation(points_1, points_2, 
     % plot the similar, notsimilar, and false positive points
     figure;
     if size(similar,1) > 0
-        plot3(similar(:,1), similar(:,2), similar(:,3), 'g*');
+        plot3(similar(:,1), similar(:,2), similar(:,3), 'go', 'MarkerSize', 1);
     end
     hold on;
     if size(notsimilar,1) > 0
-        plot3(notsimilar(:,1), notsimilar(:,2), notsimilar(:,3), 'r*');
+        plot3(notsimilar(:,1), notsimilar(:,2), notsimilar(:,3), 'ro', 'MarkerSize', 1);
     end
     hold on;
     if size(falsePos,1) > 0
-        plot3(falsePos(:,1), falsePos(:,2), falsePos(:,3), 'b*');
+        plot3(falsePos(:,1), falsePos(:,2), falsePos(:,3), 'bo', 'MarkerSize', 1);
     end
     
     accuracy = size(similar,1)/(size(similar,1)+size(notsimilar,1));
